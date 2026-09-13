@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}MAXX AI DOJO{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ url_for('index') }}">MAXX AI DOJO</a>
+  <nav>
+    <a href="{{ url_for('index') }}">บทเรียน</a>
+    <a href="{{ url_for('notebook') }}">สมุดพก</a>
+    <a href="{{ url_for('logout') }}">ออก</a>
+  </nav>
+</header>
+<main>
+{% with msgs = get_flashed_messages() %}{% if msgs %}
+  <div class="flash">{% for m in msgs %}<p>{{ m }}</p>{% endfor %}</div>
+{% endif %}{% endwith %}
+{% block body %}{% endblock %}
+</main>
+<footer class="foot">ครูคือ Claude · คะแนน 0-10 ผ่านที่ 7 · ส่งได้ 3 ครั้งต่อข้อ</footer>
+{% block script %}{% endblock %}
+</body>
+</html>

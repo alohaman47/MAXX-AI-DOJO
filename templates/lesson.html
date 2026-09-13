@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}บท {{ l.id }} — {{ l.title }}{% endblock %}
+{% block body %}
+<article class="lesson">
+  <p class="crumb"><a href="{{ url_for('index') }}">บทเรียน</a> / บท {{ l.id }}</p>
+  <h1>{{ l.title }}</h1>
+  <p class="tagline">{{ l.tagline }}</p>
+
+  {% for s in l.sections %}
+  <section>
+    <h2>{{ s.h }}</h2>
+    {% for p in s.p %}<p>{{ p }}</p>{% endfor %}
+  </section>
+  {% endfor %}
+
+  <h2 class="part">ตัวอย่างเทียบกัน</h2>
+  {% for ex in l.examples %}
+  <div class="example">
+    <h3>{{ ex.title }}</h3>
+    <div class="pair">
+      <div class="bad"><span>ไม่ดี</span><pre>{{ ex.bad }}</pre></div>
+      <div class="good"><span>ดี</span><pre>{{ ex.good }}</pre></div>
+    </div>
+    <p class="why">{{ ex.why }}</p>
+  </div>
+  {% endfor %}
+
+  <h2 class="part">แบบฝึกหัด</h2>
+  <ul class="exercises">
+  {% for e in l.exercises %}
+    {% set s = st.exercises[e.id] %}
+    <li class="ex-row st-{{ s.state }}">
+      <a href="{{ url_for('exercise', lid=l.id, ex_id=e.id) }}">
+        <span class="txt"><strong>{{ e.id }} · {{ e.title }}</strong>
+          <small>{{ 'คุยกับ AI ผู้ช่วยแล้วส่งบทสนทนา' if e.type == 'sandbox' else 'พิมพ์คำตอบส่งครู' }}</small></span>
+        <span class="state">
+          {% if s.best %}<b class="score">{{ s.best.score + (s.best.bonus or 0) }}</b>{% endif %}
+          {% if s.state == 'passed' %}ผ่าน{% elif s.state == 'done' %}ครบ 3 ครั้ง{% elif s.state == 'progress' %}ส่งแล้ว {{ s.attempts }}{% else %}ทำ{% endif %}
+        </span>
+      </a>
+    </li>
+  {% endfor %}
+  </ul>
+
+  {% if st.complete and next_id %}
+  <p class="next"><a class="btn" href="{{ url_for('lesson', lid=next_id) }}">ไปบท {{ next_id }}</a></p>
+  {% elif st.complete %}
+  <p class="next">จบหลักสูตรแล้ว ไปดู<a href="{{ url_for('notebook') }}">สมุดพก</a></p>
+  {% endif %}
+</article>
+{% endblock %}

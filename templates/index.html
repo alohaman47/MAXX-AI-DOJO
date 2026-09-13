@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="hero">
+  <h1>โรงฝึกทำงานร่วมกับ AI</h1>
+  <p>ผ่านแล้ว {{ done }} จาก {{ lessons|length }} บท</p>
+  <div class="bar"><span style="width: {{ (done / lessons|length * 100)|round }}%"></span></div>
+</section>
+<ol class="lessons">
+{% for l in lessons %}
+  {% set st = statuses[l.id] %}
+  <li class="lesson-row {% if st.complete %}is-done{% elif not unlocked[l.id] %}is-locked{% elif st.started %}is-active{% endif %}">
+    {% if unlocked[l.id] %}<a href="{{ url_for('lesson', lid=l.id) }}">{% else %}<div>{% endif %}
+      <span class="num">{{ l.id }}</span>
+      <span class="txt">
+        <strong>{{ l.title }}</strong>
+        <small>{{ l.tagline }}</small>
+      </span>
+      <span class="state">
+        {% if st.complete %}<b class="score">{{ st.avg }}</b>ผ่าน
+        {% elif not unlocked[l.id] %}ล็อก
+        {% elif st.started %}กำลังเรียน
+        {% else %}เริ่ม{% endif %}
+      </span>
+    {% if unlocked[l.id] %}</a>{% else %}</div>{% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% endblock %}

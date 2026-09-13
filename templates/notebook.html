@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}สมุดพก{% endblock %}
+{% block body %}
+<article class="notebook">
+  <h1>สมุดพก</h1>
+  {% if not rows %}
+    <p class="muted">ยังไม่มีคะแนน ไปทำ<a href="{{ url_for('lesson', lid=1) }}">บทที่ 1</a>ก่อน</p>
+  {% else %}
+  <section class="card">
+    <p class="lbl">คะแนนทุกครั้งที่ส่ง (รวมโบนัส)</p>
+    <canvas id="c" height="140"></canvas>
+  </section>
+  <section class="card">
+    <p class="lbl">ครูสรุปจุดแข็งจุดอ่อน</p>
+    {% if note %}<p class="note">{{ note.summary }}</p><p class="muted small">{{ note.created_at[:10] }}</p>{% else %}<p class="muted">ยังไม่ได้สรุป</p>{% endif %}
+    <form method="post" action="{{ url_for('notebook_summary') }}" onsubmit="this.querySelector('button').disabled=true">
+      <button type="submit" class="ghost">ให้ครูสรุปใหม่จากคะแนนล่าสุด</button>
+    </form>
+  </section>
+  <ul class="lessons compact">
+  {% for l in per_lesson %}
+    <li class="lesson-row {% if l.complete %}is-done{% endif %}"><a href="{{ url_for('lesson', lid=l.id) }}">
+      <span class="num">{{ l.id }}</span><span class="txt"><strong>{{ l.title }}</strong></span>
+      <span class="state">{% if l.avg is not none %}<b class="score">{{ l.avg }}</b>{% endif %}{{ 'ผ่าน' if l.complete else '' }}</span></a></li>
+  {% endfor %}
+  </ul>
+  <h2 class="part">ทุกครั้งที่ส่ง</h2>
+  {% for r in rows|reverse %}
+    <p class="logline"><a href="{{ url_for('exercise', lid=r.lesson_id, ex_id=r.exercise_id) }}"><b class="score">{{ r.score }}{% if r.bonus is not none %}+{{ r.bonus }}{% endif %}</b> บท {{ r.lesson_id }} ข้อ {{ r.exercise_id }} ครั้งที่ {{ r.attempt }}</a> — {{ r.fb.verdict }}</p>
+  {% endfor %}
+  {% endif %}
+</article>
+{% endblock %}
+{% block script %}
+{% if rows %}
+<script>
+const v={{ chart|safe }}, lb={{ chart_labels|safe }};
+const c=document.getElementById('c'), x=c.getContext('2d');
+const W=c.width=c.clientWidth*2, H=c.height=280; x.scale(1,1);
+const n=v.length, pad=30, gap=(W-pad*2)/Math.max(n,1);
+x.strokeStyle='#C9CDD3'; x.lineWidth=2; [7].forEach(y=>{const py=H-pad-(y/12)*(H-pad*2); x.beginPath(); x.setLineDash([6,6]); x.moveTo(pad,py); x.lineTo(W-pad,py); x.stroke(); x.setLineDash([]);});
+x.fillStyle='#8A9099'; x.font='22px Sarabun'; x.fillText('7',6,H-pad-(7/12)*(H-pad*2)+8);
+x.strokeStyle='#B3261E'; x.lineWidth=4; x.beginPath();
+v.forEach((s,i)=>{const px=pad+gap*i+gap/2, py=H-pad-(s/12)*(H-pad*2); i?x.lineTo(px,py):x.moveTo(px,py);}); x.stroke();
+v.forEach((s,i)=>{const px=pad+gap*i+gap/2, py=H-pad-(s/12)*(H-pad*2); x.fillStyle=s>=7?'#2E7D5B':'#B3261E'; x.beginPath(); x.arc(px,py,8,0,7); x.fill(); x.fillStyle='#16213E'; x.font='20px Sarabun'; x.textAlign='center'; x.fillText(lb[i],px,H-6);});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}แบบฝึกหัด {{ e.id }}{% endblock %}
+{% block body %}
+<article class="exercise">
+  <p class="crumb"><a href="{{ url_for('index') }}">บทเรียน</a> / <a href="{{ url_for('lesson', lid=l.id) }}">บท {{ l.id }}</a> / ข้อ {{ e.id }}</p>
+  <h1>{{ e.title }}</h1>
+  <p class="task">{{ e.task }}</p>
+  <p class="muted">ส่งแล้ว {{ st.attempts }}/{{ MAXA }} ครั้ง · ผ่านที่ {{ PASS }} คะแนน</p>
+
+  {# ---------- คำถามแย้งกลับที่ค้างอยู่ ---------- #}
+  {% if pending %}
+  <section class="card grade">
+    {% set fb = pending.fb %}
+    <div class="scorebox"><b>{{ pending.score }}</b><span>/10</span></div>
+    <p class="verdict">{{ fb.verdict }}</p>
+    {% if fb.strengths %}<p class="lbl">ทำได้ดี</p><ul>{% for x in fb.strengths %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% if fb.weaknesses %}<p class="lbl">เสียคะแนน</p><ul>{% for x in fb.weaknesses %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    <p class="lbl">ควรแก้</p><p>{{ fb.fix }}</p>
+    <div class="followup">
+      <p class="lbl">ครูถามกลับ</p>
+      <p class="q">{{ pending.followup_q }}</p>
+      <form method="post" action="{{ url_for('followup', sid=pending.id) }}">
+        <textarea name="followup_a" rows="4" placeholder="ตอบก่อนถึงจะไปต่อได้ (โบนัสสูงสุด +2)" required></textarea>
+        <button type="submit">ส่งคำตอบให้ครู</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ---------- ส่งงาน ---------- #}
+  {% if can_submit %}
+    {% if e.type == 'text' %}
+    <section class="card">
+      <form method="post" action="{{ url_for('submit_text', lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
+        <textarea name="answer" rows="12" placeholder="พิมพ์งานที่นี่" required>{% if st.latest and st.latest.answer %}{{ st.latest.answer }}{% endif %}</textarea>
+        <button type="submit">ส่งให้ครูตรวจ</button>
+        <p class="muted small">ครูใช้เวลาตรวจประมาณ 10-20 วินาที</p>
+      </form>
+    </section>
+    {% else %}
+    <section class="card sandbox">
+      <p class="lbl">AI ผู้ช่วย</p>
+      <div id="chat" class="chat">
+        {% if sb %}{% for m in sb.msgs %}
+          <div class="msg {{ m.role }}">{{ m.content }}</div>
+        {% endfor %}{% else %}
+          <p class="muted empty">เริ่มคุยได้เลย — ครูจะอ่านทุกข้อความที่เพื่อนพิมพ์</p>
+        {% endif %}
+      </div>
+      <div class="composer">
+        <textarea id="txt" rows="3" placeholder="พิมพ์ถึง AI ผู้ช่วย"></textarea>
+        <button id="send" type="button">ส่ง</button>
+      </div>
+      <div class="row">
+        <form method="post" action="{{ url_for('sandbox_submit', lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
+          <button type="submit" class="primary">ส่งบทสนทนาให้ครูตรวจ</button>
+        </form>
+        <form method="post" action="{{ url_for('sandbox_reset', lid=l.id, ex_id=e.id) }}" onsubmit="return confirm('ล้างบทสนทนานี้?')">
+          <button type="submit" class="ghost">เริ่มใหม่</button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+  {% elif st.state == 'passed' %}
+    <p class="passed">ผ่านแล้ว คะแนนดีสุด {{ st.best.score + (st.best.bonus or 0) }}</p>
+  {% elif st.state == 'done' %}
+    <p class="passed">ส่งครบ 3 ครั้ง ไปต่อได้ แต่ควรกลับมาอ่านบทนี้อีกรอบ</p>
+  {% endif %}
+
+  {# ---------- ประวัติ ---------- #}
+  {% if subs %}
+  <h2 class="part">ประวัติการตรวจ</h2>
+  {% for s in subs|reverse %}
+  <details class="card hist" {% if loop.first and not pending %}open{% endif %}>
+    <summary><b class="score">{{ s.score }}{% if s.bonus is not none %}+{{ s.bonus }}{% endif %}</b> ครั้งที่ {{ s.attempt }} · {{ s.fb.verdict }}</summary>
+    {% if s.fb.strengths %}<p class="lbl">ทำได้ดี</p><ul>{% for x in s.fb.strengths %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% if s.fb.weaknesses %}<p class="lbl">เสียคะแนน</p><ul>{% for x in s.fb.weaknesses %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    <p class="lbl">ควรแก้</p><p>{{ s.fb.fix }}</p>
+    <p class="lbl">ครูถามกลับ</p><p class="q">{{ s.followup_q }}</p>
+    {% if s.followup_a %}
+      <p class="lbl">เพื่อนตอบ</p><p>{{ s.followup_a }}</p>
+      <p class="lbl">ครูว่า (+{{ s.bonus }})</p><p>{{ s.followup_comment }}</p>
+    {% endif %}
+    {% if s.answer %}<p class="lbl">งานที่ส่ง</p><pre class="answer">{{ s.answer }}</pre>{% endif %}
+    {% if s.transcript %}<p class="lbl">บทสนทนาที่ส่ง</p>
+      {% for m in s.transcript|fromjson %}<div class="msg {{ m.role }} small">{{ m.content }}</div>{% endfor %}{% endif %}
+  </details>
+  {% endfor %}
+  {% endif %}
+</article>
+{% endblock %}
+{% block script %}
+<script>
+function busy(f){ const b=f.querySelector('button'); b.disabled=true; b.textContent='ครูกำลังตรวจ…'; return true; }
+const chat=document.getElementById('chat');
+if(chat){
+  const txt=document.getElementById('txt'), send=document.getElementById('send');
+  const add=(role,text)=>{ const d=document.createElement('div'); d.className='msg '+role; d.textContent=text; chat.appendChild(d); chat.scrollTop=chat.scrollHeight; const e=chat.querySelector('.empty'); if(e) e.remove(); return d; };
+  async function go(){
+    const t=txt.value.trim(); if(!t) return;
+    txt.value=''; add('user',t); send.disabled=true;
+    const w=add('assistant','…');
+    try{
+      const r=await fetch(location.pathname+'/sandbox/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+      const j=await r.json();
+      w.textContent=j.reply||('ผิดพลาด: '+(j.error||''));
+    }catch(e){ w.textContent='เชื่อมต่อไม่ได้'; }
+    send.disabled=false; chat.scrollTop=chat.scrollHeight;
+  }
+  send.onclick=go;
+  txt.addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)) go(); });
+  chat.scrollTop=chat.scrollHeight;
+}
+</script>
+{% endblock %}
