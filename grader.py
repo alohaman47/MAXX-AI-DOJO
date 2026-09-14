@@ -18,7 +18,7 @@ def client():
     return _client
 
 
-TEACHER_SYSTEM = """คุณคือ "ครู" ของหลักสูตร MAXX AI DOJO — หลักสูตรฝึกคนให้ทำงานร่วมกับ AI ได้เก่ง
+TEACHER_SYSTEM = """คุณคือ "ครู" ของ MAXX DOJO — โรงฝึกที่มีหลายหลักสูตร (ระบุคอร์สในข้อความ)
 ผู้เรียนชื่อ Maxx เรียกเขาว่า "เพื่อน" ใช้ภาษาไทยแบบตรงไปตรงมา เป็นกันเอง แต่เข้มงวด
 
 หลักการให้คะแนน (0-10):
@@ -35,7 +35,7 @@ TEACHER_SYSTEM = """คุณคือ "ครู" ของหลักสู�
 {"score": <0-10 จำนวนเต็ม>, "verdict": "<ประโยคเดียวสรุปผล>", "strengths": ["<จุดที่ทำได้ดี สั้นๆ>"], "weaknesses": ["<จุดที่เสียคะแนน พร้อมเหตุผล>"], "fix": "<สิ่งที่ควรแก้ก่อนส่งใหม่ ถ้าผ่านแล้วบอกว่าจะยกระดับได้ยังไง>", "followup": "<คำถามแย้งกลับ 1 ข้อ>"}
 """
 
-FOLLOWUP_SYSTEM = """คุณคือ "ครู" ของหลักสูตร MAXX AI DOJO ผู้เรียนชื่อ Maxx เรียกเขาว่า "เพื่อน" ภาษาไทย ตรงไปตรงมา
+FOLLOWUP_SYSTEM = """คุณคือ "ครู" ของ MAXX DOJO ผู้เรียนชื่อ Maxx เรียกเขาว่า "เพื่อน" ภาษาไทย ตรงไปตรงมา
 ก่อนหน้านี้คุณตรวจงานและถามคำถามแย้งกลับไป ตอนนี้ผู้เรียนตอบมาแล้ว
 ประเมินว่าคำตอบแสดงวิจารณญาณจริงไหม: เขาหาจุดที่งานของตัวเองอาจผิดได้จริงหรือแค่ตอบให้พ้นๆ / เหตุผลเจาะจงกับงานของเขาหรือกว้างๆ / ยอมรับความไม่แน่นอนได้อย่างซื่อสัตย์ไหม
 ให้คะแนนโบนัส 0-2 (2 = คิดได้ลึกและเจาะจง, 1 = พอใช้, 0 = ไม่ได้คิดจริง)
@@ -67,9 +67,10 @@ def _transcript_text(messages):
     return "\n".join(lines)
 
 
-def grade(lesson, exercise, answer=None, transcript=None, attempt=1, previous_feedback=None):
+def grade(lesson, exercise, answer=None, transcript=None, attempt=1, previous_feedback=None, course_context=""):
     """ตรวจงาน คืน dict ตาม TEACHER_SYSTEM"""
     parts = [
+        f"คอร์ส: {course_context}",
         f"บทที่ {lesson['id']}: {lesson['title']}",
         f"แบบฝึกหัด {exercise['id']}: {exercise['title']}",
         f"โจทย์: {exercise['task']}",
@@ -98,8 +99,9 @@ def grade(lesson, exercise, answer=None, transcript=None, attempt=1, previous_fe
     return data
 
 
-def grade_followup(lesson, exercise, followup_question, followup_answer, original_answer_summary):
+def grade_followup(lesson, exercise, followup_question, followup_answer, original_answer_summary, course_context=""):
     prompt = (
+        f"คอร์ส: {course_context}\n"
         f"บทที่ {lesson['id']}: {lesson['title']} / แบบฝึกหัด {exercise['id']}\n"
         f"งานที่ผู้เรียนส่งมา (ย่อ):\n{original_answer_summary[:2000]}\n\n"
         f"คำถามแย้งกลับที่ครูถาม:\n{followup_question}\n\n"
@@ -129,7 +131,7 @@ def sandbox_reply(exercise, messages):
     return "".join(b.text for b in resp.content if b.type == "text")
 
 
-def progress_summary(rows):
+def progress_summary(rows, course_title="", lesson_titles=None):
     """สรุปจุดแข็งจุดอ่อนจากประวัติคะแนนทั้งหมด (rows = list of dict)"""
     if not rows:
         return None
@@ -139,9 +141,9 @@ def progress_summary(rows):
             f"บท {r['lesson_id']} ข้อ {r['exercise_id']} ครั้งที่ {r['attempt']}: "
             f"{r['score']}/10 โบนัส {r.get('bonus') or 0} — {r.get('verdict') or ''}"
         )
+    titles = ", ".join(f"{k} {v}" for k, v in (lesson_titles or {}).items())
     prompt = (
-        "นี่คือประวัติคะแนนทั้งหมดของผู้เรียนในหลักสูตร 8 บท "
-        "(1 รู้จัก AI, 2 ตั้งโจทย์, 3 ทำซ้ำ, 4 แตกงาน, 5 ตรวจสอบ, 6 ทีม AI, 7 AI ในระบบ, 8 วิจารณญาณ)\n\n"
+        f"นี่คือประวัติคะแนนทั้งหมดของผู้เรียนในหลักสูตร {course_title} ({titles})\n\n"
         + "\n".join(lines)
         + "\n\nเขียนสรุปสั้นๆ 4-6 ประโยค ภาษาไทย เรียกผู้เรียนว่า 'เพื่อน': จุดแข็ง 1-2 อย่าง จุดอ่อน 1-2 อย่าง (ระบุบท) และสิ่งเดียวที่ควรฝึกต่อ ห้ามชมพิธี ตอบเป็นข้อความธรรมดาไม่ใช่ JSON"
     )

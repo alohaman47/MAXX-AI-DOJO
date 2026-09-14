@@ -2,7 +2,7 @@
 {% block title %}บท {{ l.id }} — {{ l.title }}{% endblock %}
 {% block body %}
 <article class="lesson">
-  <p class="crumb"><a href="{{ url_for('index') }}">บทเรียน</a> / บท {{ l.id }}</p>
+  <p class="crumb"><a href="{{ url_for('index', course=c.slug) }}">{{ c.title }}</a> / บท {{ l.id }}</p>
   <h1>{{ l.title }}</h1>
   <p class="tagline">{{ l.tagline }}</p>
 
@@ -30,7 +30,7 @@
   {% for e in l.exercises %}
     {% set s = st.exercises[e.id] %}
     <li class="ex-row st-{{ s.state }}">
-      <a href="{{ url_for('exercise', lid=l.id, ex_id=e.id) }}">
+      <a href="{{ url_for('exercise', course=c.slug, lid=l.id, ex_id=e.id) }}">
         <span class="txt"><strong>{{ e.id }} · {{ e.title }}</strong>
           <small>{{ 'คุยกับ AI ผู้ช่วยแล้วส่งบทสนทนา' if e.type == 'sandbox' else 'พิมพ์คำตอบส่งครู' }}</small></span>
         <span class="state">
@@ -43,9 +43,9 @@
   </ul>
 
   {% if st.complete and next_id %}
-  <p class="next"><a class="btn" href="{{ url_for('lesson', lid=next_id) }}">ไปบท {{ next_id }}</a></p>
+  <p class="next"><a class="btn" href="{{ url_for('lesson', course=c.slug, lid=next_id) }}">ไปบท {{ next_id }}</a></p>
   {% elif st.complete %}
-  <p class="next">จบหลักสูตรแล้ว ไปดู<a href="{{ url_for('notebook') }}">สมุดพก</a></p>
+  <p class="next">จบหลักสูตรแล้ว ไปดู<a href="{{ url_for('notebook', course=c.slug) }}">สมุดพก</a></p>
   {% endif %}
 </article>
 {% endblock %}

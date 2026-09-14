@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block body %}
 <section class="hero">
-  <h1>โรงฝึกทำงานร่วมกับ AI</h1>
+  <p class="crumb"><a href="{{ url_for('home') }}">คอร์ส</a> / {{ c.title }}</p>
+  <h1>{{ c.subtitle }}</h1>
   <p>ผ่านแล้ว {{ done }} จาก {{ lessons|length }} บท</p>
   <div class="bar"><span style="width: {{ (done / lessons|length * 100)|round }}%"></span></div>
 </section>
@@ -9,7 +10,7 @@
 {% for l in lessons %}
   {% set st = statuses[l.id] %}
   <li class="lesson-row {% if st.complete %}is-done{% elif not unlocked[l.id] %}is-locked{% elif st.started %}is-active{% endif %}">
-    {% if unlocked[l.id] %}<a href="{{ url_for('lesson', lid=l.id) }}">{% else %}<div>{% endif %}
+    {% if unlocked[l.id] %}<a href="{{ url_for('lesson', course=c.slug, lid=l.id) }}">{% else %}<div>{% endif %}
       <span class="num">{{ l.id }}</span>
       <span class="txt">
         <strong>{{ l.title }}</strong>

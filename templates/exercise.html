@@ -2,7 +2,7 @@
 {% block title %}แบบฝึกหัด {{ e.id }}{% endblock %}
 {% block body %}
 <article class="exercise">
-  <p class="crumb"><a href="{{ url_for('index') }}">บทเรียน</a> / <a href="{{ url_for('lesson', lid=l.id) }}">บท {{ l.id }}</a> / ข้อ {{ e.id }}</p>
+  <p class="crumb"><a href="{{ url_for('index', course=c.slug) }}">{{ c.title }}</a> / <a href="{{ url_for('lesson', course=c.slug, lid=l.id) }}">บท {{ l.id }}</a> / ข้อ {{ e.id }}</p>
   <h1>{{ e.title }}</h1>
   <p class="task">{{ e.task }}</p>
   <p class="muted">ส่งแล้ว {{ st.attempts }}/{{ MAXA }} ครั้ง · ผ่านที่ {{ PASS }} คะแนน</p>
@@ -31,7 +31,7 @@
   {% if can_submit %}
     {% if e.type == 'text' %}
     <section class="card">
-      <form method="post" action="{{ url_for('submit_text', lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
+      <form method="post" action="{{ url_for('submit_text', course=c.slug, lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
         <textarea name="answer" rows="12" placeholder="พิมพ์งานที่นี่" required>{% if st.latest and st.latest.answer %}{{ st.latest.answer }}{% endif %}</textarea>
         <button type="submit">ส่งให้ครูตรวจ</button>
         <p class="muted small">ครูใช้เวลาตรวจประมาณ 10-20 วินาที</p>
@@ -52,10 +52,10 @@
         <button id="send" type="button">ส่ง</button>
       </div>
       <div class="row">
-        <form method="post" action="{{ url_for('sandbox_submit', lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
+        <form method="post" action="{{ url_for('sandbox_submit', course=c.slug, lid=l.id, ex_id=e.id) }}" onsubmit="return busy(this)">
           <button type="submit" class="primary">ส่งบทสนทนาให้ครูตรวจ</button>
         </form>
-        <form method="post" action="{{ url_for('sandbox_reset', lid=l.id, ex_id=e.id) }}" onsubmit="return confirm('ล้างบทสนทนานี้?')">
+        <form method="post" action="{{ url_for('sandbox_reset', course=c.slug, lid=l.id, ex_id=e.id) }}" onsubmit="return confirm('ล้างบทสนทนานี้?')">
           <button type="submit" class="ghost">เริ่มใหม่</button>
         </form>
       </div>

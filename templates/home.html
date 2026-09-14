@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="hero">
+  <h1>โรงฝึกของ Maxx</h1>
+  <p class="muted">เลือกคอร์ส ครูคือ Claude ตรวจทุกข้อ</p>
+</section>
+<ol class="lessons">
+{% for k in cards %}
+  <li class="lesson-row {% if k.done == k.total %}is-done{% elif k.started %}is-active{% endif %}">
+    <a href="{{ url_for('index', course=k.c.slug) }}">
+      <span class="num">{{ loop.index }}</span>
+      <span class="txt"><strong>{{ k.c.title }}</strong><small>{{ k.c.subtitle }}</small></span>
+      <span class="state">{{ k.done }}/{{ k.total }} บท</span>
+    </a>
+  </li>
+{% endfor %}
+</ol>
+{% endblock %}

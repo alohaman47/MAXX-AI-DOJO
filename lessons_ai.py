@@ -329,13 +329,3 @@ LESSONS = [
 },
 ]
 
-LESSON_BY_ID = {l["id"]: l for l in LESSONS}
-
-def get_exercise(lesson_id, ex_id):
-    l = LESSON_BY_ID.get(lesson_id)
-    if not l:
-        return None, None
-    for e in l["exercises"]:
-        if e["id"] == ex_id:
-            return l, e
-    return l, None
