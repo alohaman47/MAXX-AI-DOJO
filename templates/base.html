@@ -17,6 +17,14 @@
     <a href="{{ url_for('logout') }}">ออก</a>
   </nav>
 </header>
+{% if focus is defined and focus %}
+<div class="focusbar" data-start="{{ focus.started_at }}">
+  <span>session <b id="fmin">…</b></span>
+  <form method="post" action="{{ url_for('session_end', course=focus.course) }}" class="inline">
+    <input name="note" placeholder="ทำอะไรไป (สั้นๆ)"><button type="submit" class="ghost small">จบ</button>
+  </form>
+</div>
+{% endif %}
 <main>
 {% with msgs = get_flashed_messages() %}{% if msgs %}
   <div class="flash">{% for m in msgs %}<p>{{ m }}</p>{% endfor %}</div>
@@ -24,6 +32,10 @@
 {% block body %}{% endblock %}
 </main>
 <footer class="foot">ครูคือ Claude · คะแนน 0-10 ผ่านที่ 7 · ส่งได้ 3 ครั้งต่อข้อ</footer>
+<script>
+(function(){const f=document.querySelector('.focusbar');if(!f)return;const st=new Date(f.dataset.start+'Z');const el=document.getElementById('fmin');
+function t(){const m=Math.floor((Date.now()-st)/60000);el.textContent=(25-m>0?(25-m)+' นาทีเหลือ':'ครบ 25 นาที (+'+(m-25)+')');}t();setInterval(t,15000);})();
+</script>
 {% block script %}{% endblock %}
 </body>
 </html>

@@ -83,3 +83,9 @@ form button{margin-top:10px}
 canvas{width:100%}
 @media (min-width:560px){.pair{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.focusbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--pen);color:#fff;padding:8px 16px;font-size:14px}
+.focusbar form{display:flex;gap:6px;margin:0}.focusbar input{flex:1;padding:6px 8px;border:0;border-radius:6px;font:inherit;font-size:13px;max-width:200px}
+.focusbar button{margin:0;padding:6px 10px;color:#fff;border-color:rgba(255,255,255,.5)}
+.startsess{margin:0 0 14px}.startsess button{margin:0}
+form.inline{display:inline}

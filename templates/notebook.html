@@ -5,7 +5,7 @@
   <p class="crumb"><a href="{{ url_for('index', course=c.slug) }}">{{ c.title }}</a> / สมุดพก</p>
   <h1>สมุดพก</h1>
   {% if not rows %}
-    <p class="muted">ยังไม่มีคะแนน ไปทำ<a href="{{ url_for('lesson', course=c.slug, lid=1) }}">บทที่ 1</a>ก่อน</p>
+    <p class="muted">ยังไม่มีคะแนน ไปทำ<a href="{{ url_for('lesson', course=c.slug, lid=0) }}">บท 0</a>ก่อน</p>
   {% else %}
   <section class="card">
     <p class="lbl">คะแนนทุกครั้งที่ส่ง (รวมโบนัส)</p>
@@ -18,6 +18,31 @@
       <button type="submit" class="ghost">ให้ครูสรุปใหม่จากคะแนนล่าสุด</button>
     </form>
   </section>
+  <section class="card">
+    <p class="lbl">ห้องซ้อม (Drill)</p>
+    <p class="muted small">ครูดูจากประวัติว่าอ่อนเรื่องไหน แล้วสร้างแบบฝึก 5 นาทีเฉพาะจุดนั้น ไม่นับคะแนนคอร์ส</p>
+    <form method="post" action="{{ url_for('drill_new', course=c.slug) }}" onsubmit="this.querySelector('button').disabled=true"><button type="submit">ซ้อมจุดอ่อน</button></form>
+    {% for d in drills %}<p class="logline"><a href="{{ url_for('drill', course=c.slug, did=d.id) }}">{% if d.score is not none %}<b class="score">{{ d.score }}</b>{% endif %}{{ d.title }}</a> — {{ d.weakness }}</p>{% endfor %}
+  </section>
+  <section class="card">
+    <p class="lbl">เวลาเรียนจริง (Focus)</p>
+    <p><b class="score">{{ week_min }}</b>นาทีใน 7 วันที่ผ่านมา</p>
+    {% if not focus %}<form method="post" action="{{ url_for('session_start', course=c.slug) }}"><button type="submit" class="ghost">เริ่ม session 25 นาที</button></form>{% endif %}
+    {% for x in sess[:8] %}<p class="logline small">{{ x.started_at[:10] }} · {{ x.minutes }} นาที{% if x.note %} — {{ x.note }}{% endif %}</p>{% endfor %}
+  </section>
+  {% if cards %}
+  <section class="card">
+    <p class="lbl">การ์ดทบทวน (Retention)</p>
+    {% for k in cards %}<p class="logline small">{% if k.due_at <= now_iso %}<b class="score">ถึงเวลา</b>{% else %}ครบ {{ k.due_at[:10] }}{% endif %} บท {{ k.lesson_id }} · ทุก {{ k.interval_days }} วัน · {{ k.question }}</p>{% endfor %}
+  </section>
+  {% endif %}
+  {% if plan and all_done %}
+  <section class="card grade">
+    <p class="lbl">จบคอร์สแล้ว — นี่คือแผนที่เพื่อนเขียนไว้ตอนบท 0</p>
+    <pre class="answer">{{ plan.answer }}</pre>
+    <p class="muted small">ตรงกับที่คิดไว้แค่ไหน? ข้อ 4 (จะรู้ได้ยังไงว่าเก่งแล้ว) ทำได้หรือยัง</p>
+  </section>
+  {% endif %}
   <ul class="lessons compact">
   {% for l in per_lesson %}
     <li class="lesson-row {% if l.complete %}is-done{% endif %}"><a href="{{ url_for('lesson', course=c.slug, lid=l.id) }}">

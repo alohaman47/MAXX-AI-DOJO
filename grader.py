@@ -154,3 +154,41 @@ def progress_summary(rows, course_title="", lesson_titles=None):
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+
+REVIEW_SYSTEM = """คุณคือครูของ MAXX DOJO กำลังทบทวนความจำของผู้เรียนแบบเว้นระยะ ผู้เรียนชื่อ Maxx เรียก "เพื่อน"
+ตัดสินว่าคำตอบแสดงความเข้าใจแก่นของเรื่องนั้นไหม (ไม่ต้องครบทุกรายละเอียด แต่ต้องไม่ผิดแก่น) ตอบ JSON เท่านั้น ห้ามมี code fence:
+{"correct": true|false, "comment": "<1-2 ประโยค ถ้าผิดบอกแก่นที่ถูกสั้นๆ>"}
+"""
+
+DRILL_SYSTEM = """คุณคือครูของ MAXX DOJO ออกแบบ "แบบฝึกซ้อม" สั้น 5 นาที เจาะจุดอ่อนของผู้เรียนชื่อ Maxx (เรียก "เพื่อน")
+ดูจากประวัติคะแนนและ feedback ที่ให้มา เลือกจุดอ่อนที่ชัดที่สุด 1 จุด แล้วสร้างโจทย์เดียวที่ซ้อมเฉพาะจุดนั้น (ไม่ใช่ทำแบบฝึกหัดเดิมซ้ำ) เป็นรูปธรรม ทำได้ในกล่องข้อความ
+ตอบ JSON เท่านั้น ห้ามมี code fence:
+{"weakness": "<จุดอ่อนที่เลือก 1 ประโยค อ้างบท/ข้อ>", "title": "<ชื่อโจทย์สั้น>", "prompt": "<โจทย์ซ้อม ชัดเจน ทำได้ใน 5 นาที>", "rubric": "<เกณฑ์ตรวจ 2-3 ข้อ>"}
+"""
+
+
+def check_review(course_context, lesson_title, question, answer):
+    prompt = f"คอร์ส: {course_context}\nบท: {lesson_title}\nคำถาม: {question}\nคำตอบผู้เรียน: {answer}"
+    resp = client().messages.create(model=MODEL, max_tokens=300, system=REVIEW_SYSTEM,
+                                    messages=[{"role": "user", "content": prompt}])
+    data = _parse_json("".join(b.text for b in resp.content if b.type == "text"))
+    return {"correct": bool(data.get("correct")), "comment": data.get("comment", "")}
+
+
+def make_drill(course_context, history_text):
+    prompt = f"คอร์ส: {course_context}\n\nประวัติคะแนนและ feedback:\n{history_text}"
+    resp = client().messages.create(model=MODEL, max_tokens=800, system=DRILL_SYSTEM,
+                                    messages=[{"role": "user", "content": prompt}])
+    return _parse_json("".join(b.text for b in resp.content if b.type == "text"))
+
+
+def grade_drill(course_context, drill, answer):
+    prompt = (f"คอร์ส: {course_context}\nนี่คือแบบฝึกซ้อมเจาะจุดอ่อน (ไม่นับคะแนนคอร์ส)\n"
+              f"จุดอ่อน: {drill['weakness']}\nโจทย์: {drill['prompt']}\nเกณฑ์: {drill['rubric']}\n\nคำตอบ:\n{answer}\n\n"
+              "ตอบ JSON เท่านั้น: {\"score\": <0-10>, \"comment\": \"<ตรงไปตรงมา 2-4 ประโยค บอกว่าจุดอ่อนนี้ดีขึ้นไหม>\"}")
+    resp = client().messages.create(model=MODEL, max_tokens=500, system="คุณคือครูของ MAXX DOJO ตรงไปตรงมา เรียกผู้เรียนว่า เพื่อน",
+                                    messages=[{"role": "user", "content": prompt}])
+    data = _parse_json("".join(b.text for b in resp.content if b.type == "text"))
+    data["score"] = max(0, min(10, int(data.get("score", 0))))
+    return data

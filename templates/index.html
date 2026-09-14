@@ -6,12 +6,25 @@
   <p>ผ่านแล้ว {{ done }} จาก {{ lessons|length }} บท</p>
   <div class="bar"><span style="width: {{ (done / lessons|length * 100)|round }}%"></span></div>
 </section>
+{% if review %}
+<section class="card grade">
+  <p class="lbl">ทบทวนเว้นระยะ · จากบท {{ review.lesson_id }} {{ review.lesson_title }}</p>
+  <p class="q">{{ review.question }}</p>
+  <form method="post" action="{{ url_for('review_answer', course=c.slug, cid=review.id) }}" onsubmit="this.querySelector('button').disabled=true">
+    <textarea name="answer" rows="3" placeholder="ตอบจากหัว ไม่เปิดดู" required></textarea>
+    <button type="submit">ตอบ</button>
+  </form>
+</section>
+{% endif %}
+{% if not focus %}
+<form method="post" action="{{ url_for('session_start', course=c.slug) }}" class="startsess"><button type="submit" class="ghost">เริ่ม session 25 นาที</button></form>
+{% endif %}
 <ol class="lessons">
 {% for l in lessons %}
   {% set st = statuses[l.id] %}
   <li class="lesson-row {% if st.complete %}is-done{% elif not unlocked[l.id] %}is-locked{% elif st.started %}is-active{% endif %}">
     {% if unlocked[l.id] %}<a href="{{ url_for('lesson', course=c.slug, lid=l.id) }}">{% else %}<div>{% endif %}
-      <span class="num">{{ l.id }}</span>
+      <span class="num">{{ l.id if l.id > 0 else '0' }}</span>
       <span class="txt">
         <strong>{{ l.title }}</strong>
         <small>{{ l.tagline }}</small>

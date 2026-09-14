@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """ทะเบียนคอร์สทั้งหมด — เพิ่มคอร์สใหม่: สร้าง lessons_<slug>.py แล้วลงทะเบียนที่นี่"""
+import copy
 import lessons_ai
 import lessons_humanoid
+import ultra
 
 COURSES = {
     "ai": {
@@ -22,6 +24,23 @@ COURSES = {
     },
 }
 ORDER = ["ai", "humanoid"]
+
+
+def _apply_ultra():
+    """เติมชั้น Ultralearning ให้ทุกคอร์ส: บท 0, คำถาม retrieval, ข้อ Feynman"""
+    for slug, c in COURSES.items():
+        lessons = copy.deepcopy(c["lessons"])
+        for l in lessons:
+            l["retrieval"] = ultra.RETRIEVAL.get(slug, {}).get(l["id"], [])
+            concept = ultra.FEYNMAN.get(slug, {}).get(l["id"])
+            if concept and not any(e["id"].endswith("f") for e in l["exercises"]):
+                l["exercises"].append(ultra.feynman_exercise(l["id"], concept))
+        l0 = ultra.metalearning_lesson(c["title"], c["subtitle"])
+        l0["retrieval"] = []
+        c["lessons"] = [l0] + lessons
+
+
+_apply_ultra()
 
 
 def get_course(slug):

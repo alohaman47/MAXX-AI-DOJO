@@ -13,7 +13,7 @@ ENV ที่ต้องตั้งบน Railway:
 """
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
@@ -113,6 +113,45 @@ def init_db():
     )""")
 
 
+    q(f"""CREATE TABLE IF NOT EXISTS retrieval (
+        id {SERIAL},
+        course TEXT NOT NULL,
+        lesson_id INTEGER NOT NULL,
+        answers TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )""")
+    q(f"""CREATE TABLE IF NOT EXISTS review_cards (
+        id {SERIAL},
+        course TEXT NOT NULL,
+        lesson_id INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        interval_days INTEGER NOT NULL DEFAULT 3,
+        due_at TEXT NOT NULL,
+        reps INTEGER NOT NULL DEFAULT 0,
+        last_result INTEGER,
+        last_comment TEXT,
+        created_at TEXT NOT NULL
+    )""")
+    q(f"""CREATE TABLE IF NOT EXISTS drills (
+        id {SERIAL},
+        course TEXT NOT NULL,
+        weakness TEXT NOT NULL,
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        rubric TEXT NOT NULL,
+        answer TEXT,
+        score INTEGER,
+        comment TEXT,
+        created_at TEXT NOT NULL
+    )""")
+    q(f"""CREATE TABLE IF NOT EXISTS sessions (
+        id {SERIAL},
+        course TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        minutes INTEGER,
+        note TEXT
+    )""")
     # migration สำหรับฐานข้อมูลเวอร์ชันแรกที่ยังไม่มีคอลัมน์ course
     for t in ("submissions", "sandbox", "notes"):
         try:
@@ -195,9 +234,48 @@ def lesson_status(course, lesson):
 
 
 def lesson_unlocked(lesson_id, statuses):
-    if FREE_MODE or lesson_id == 1:
+    if FREE_MODE or lesson_id == 0:
         return True
     return statuses[lesson_id - 1]["complete"]
+
+
+# ------------------------------------------------------------------ ultralearning helpers
+def retrieval_done(course, lid):
+    return q("SELECT * FROM retrieval WHERE course=? AND lesson_id=? ORDER BY id DESC LIMIT 1", (course, lid), fetch="one")
+
+
+def ensure_review_cards(course, lesson):
+    """สร้างการ์ดทบทวนเมื่อผ่านบท (ครั้งเดียว)"""
+    if not lesson.get("retrieval"):
+        return
+    if q("SELECT id FROM review_cards WHERE course=? AND lesson_id=? LIMIT 1", (course, lesson["id"]), fetch="one"):
+        return
+    due = (datetime.utcnow() + timedelta(days=3)).isoformat(timespec="seconds")
+    for qu in lesson["retrieval"]:
+        insert_returning("review_cards", ["course", "lesson_id", "question", "interval_days", "due_at", "reps", "created_at"],
+                         [course, lesson["id"], qu, 3, due, 0, now()])
+
+
+def due_review(course):
+    return q("SELECT * FROM review_cards WHERE course=? AND due_at<=? ORDER BY due_at LIMIT 1",
+             (course, now()), fetch="one")
+
+
+def sync_review_cards(course, statuses):
+    c = COURSES[course]
+    for l in c["lessons"]:
+        if statuses[l["id"]]["complete"]:
+            ensure_review_cards(course, l)
+
+
+def active_session():
+    sid = session.get("focus_id")
+    if not sid:
+        return None
+    s = q("SELECT * FROM sessions WHERE id=? AND ended_at IS NULL", (sid,), fetch="one")
+    if not s:
+        session.pop("focus_id", None)
+    return s
 
 
 def all_statuses(course):
@@ -228,8 +306,12 @@ def index(course):
     statuses = all_statuses(course)
     unlocked = {l["id"]: lesson_unlocked(l["id"], statuses) for l in c["lessons"]}
     done = sum(1 for s in statuses.values() if s["complete"])
+    sync_review_cards(course, statuses)
+    review = due_review(course)
+    if review:
+        review["lesson_title"] = lesson_by_id(course, review["lesson_id"])["title"]
     return render_template("index.html", c=c, lessons=c["lessons"], statuses=statuses,
-                           unlocked=unlocked, done=done)
+                           unlocked=unlocked, done=done, review=review, focus=active_session())
 
 
 @app.route("/<course>/lesson/<int:lid>")
@@ -241,8 +323,14 @@ def lesson(course, lid):
     if not lesson_unlocked(lid, statuses):
         flash("บทนี้ยังล็อกอยู่ ทำบทก่อนหน้าให้ผ่านก่อน")
         return redirect(url_for("index", course=course))
-    return render_template("lesson.html", c=c, l=l, st=statuses[lid],
-                           next_id=lid + 1 if lid < len(c["lessons"]) else None)
+    pre = retrieval_done(course, lid)
+    if l.get("retrieval") and not pre:
+        return render_template("retrieval.html", c=c, l=l)
+    if pre:
+        pre["answers"] = json.loads(pre["answers"])
+    return render_template("lesson.html", c=c, l=l, st=statuses[lid], pre=pre,
+                           next_id=lid + 1 if lid < len(c["lessons"]) - 1 else None,
+                           focus=active_session())
 
 
 @app.route("/<course>/exercise/<int:lid>/<ex_id>")
@@ -414,7 +502,16 @@ def notebook(course):
     per_lesson = [{"id": l["id"], "title": l["title"], "avg": statuses[l["id"]]["avg"],
                    "complete": statuses[l["id"]]["complete"]} for l in c["lessons"]]
     note = q("SELECT * FROM notes WHERE course=? ORDER BY id DESC LIMIT 1", (course,), fetch="one")
+    drills = q("SELECT * FROM drills WHERE course=? ORDER BY id DESC LIMIT 10", (course,), fetch="all")
+    sess = q("SELECT * FROM sessions WHERE course=? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 30", (course,), fetch="all")
+    week_ago = (datetime.utcnow() - timedelta(days=7)).isoformat(timespec="seconds")
+    week_min = sum(x["minutes"] or 0 for x in sess if x["started_at"] >= week_ago)
+    cards = q("SELECT * FROM review_cards WHERE course=? ORDER BY due_at", (course,), fetch="all")
+    plan = q("SELECT answer FROM submissions WHERE course=? AND lesson_id=0 ORDER BY score DESC, id DESC LIMIT 1", (course,), fetch="one")
+    all_done = all(statuses[l["id"]]["complete"] for l in c["lessons"])
     return render_template("notebook.html", c=c, rows=rows, per_lesson=per_lesson, note=note,
+                           drills=drills, sess=sess, week_min=week_min, cards=cards, plan=plan,
+                           all_done=all_done, focus=active_session(), now_iso=now(),
                            chart=json.dumps([r["score"] + (r["bonus"] or 0) for r in rows]),
                            chart_labels=json.dumps([f"{r['lesson_id']}{r['exercise_id'][-1]}" for r in rows]))
 
@@ -435,6 +532,124 @@ def notebook_summary(course):
         insert_returning("notes", ["course", "summary", "created_at"], [course, s, now()])
     except Exception as ex:  # noqa
         flash(f"สรุปไม่สำเร็จ: {ex}")
+    return redirect(url_for("notebook", course=course))
+
+
+# ------------------------------------------------------------------ ultralearning routes
+@app.route("/<course>/lesson/<int:lid>/retrieval", methods=["POST"])
+@login_required
+def retrieval_submit(course, lid):
+    course_or_404(course)
+    l = lesson_by_id(course, lid) or abort(404)
+    answers = [(request.form.get(f"a{i}") or "").strip() for i in range(len(l.get("retrieval", [])))]
+    if any(len(a) < 2 for a in answers):
+        flash("ตอบทุกข้อก่อน เดาก็ได้ แต่ต้องพยายามดึงจากหัว")
+        return redirect(url_for("lesson", course=course, lid=lid))
+    insert_returning("retrieval", ["course", "lesson_id", "answers", "created_at"],
+                     [course, lid, json.dumps(answers, ensure_ascii=False), now()])
+    return redirect(url_for("lesson", course=course, lid=lid))
+
+
+@app.route("/<course>/review/<int:cid>", methods=["POST"])
+@login_required
+def review_answer(course, cid):
+    c = course_or_404(course)
+    card = q("SELECT * FROM review_cards WHERE id=? AND course=?", (cid, course), fetch="one") or abort(404)
+    ans = (request.form.get("answer") or "").strip()
+    if len(ans) < 2:
+        flash("ตอบก่อน")
+        return redirect(url_for("index", course=course))
+    l = lesson_by_id(course, card["lesson_id"])
+    try:
+        r = grader.check_review(c["teacher_context"], l["title"], card["question"], ans)
+    except Exception as ex:  # noqa
+        flash(f"ครูตรวจไม่สำเร็จ: {ex}")
+        return redirect(url_for("index", course=course))
+    if r["correct"]:
+        nxt = {3: 7, 7: 14, 14: 30}.get(card["interval_days"], 60)
+    else:
+        nxt = 3
+    due = (datetime.utcnow() + timedelta(days=nxt)).isoformat(timespec="seconds")
+    q("UPDATE review_cards SET interval_days=?, due_at=?, reps=reps+1, last_result=?, last_comment=? WHERE id=?",
+      (nxt, due, 1 if r["correct"] else 0, r["comment"], cid))
+    flash(("ถูก — ถามอีกครั้งใน %d วัน " % nxt if r["correct"] else "ยังไม่ตรงแก่น — กลับมาถามใน 3 วัน ") + r["comment"])
+    return redirect(url_for("index", course=course))
+
+
+@app.route("/<course>/drill/new", methods=["POST"])
+@login_required
+def drill_new(course):
+    c = course_or_404(course)
+    rows = q("SELECT lesson_id, exercise_id, attempt, score, bonus, feedback FROM submissions WHERE course=? ORDER BY created_at",
+             (course,), fetch="all")
+    if not rows:
+        flash("ยังไม่มีประวัติให้ครูดูจุดอ่อน")
+        return redirect(url_for("notebook", course=course))
+    lines = []
+    for r in rows:
+        fb = json.loads(r["feedback"])
+        lines.append(f"บท {r['lesson_id']} ข้อ {r['exercise_id']} ครั้ง {r['attempt']}: {r['score']}/10 — {fb.get('verdict','')} / จุดอ่อน: {'; '.join(fb.get('weaknesses', []))}")
+    cards = q("SELECT lesson_id, question, last_result FROM review_cards WHERE course=? AND last_result=0", (course,), fetch="all")
+    for k in cards:
+        lines.append(f"ทบทวนบท {k['lesson_id']} ตอบผิด: {k['question']}")
+    try:
+        d = grader.make_drill(c["teacher_context"], "\n".join(lines)[-6000:])
+    except Exception as ex:  # noqa
+        flash(f"สร้างแบบซ้อมไม่สำเร็จ: {ex}")
+        return redirect(url_for("notebook", course=course))
+    did = insert_returning("drills", ["course", "weakness", "title", "prompt", "rubric", "created_at"],
+                           [course, d.get("weakness", ""), d.get("title", "ซ้อม"), d.get("prompt", ""), d.get("rubric", ""), now()])
+    return redirect(url_for("drill", course=course, did=did))
+
+
+@app.route("/<course>/drill/<int:did>")
+@login_required
+def drill(course, did):
+    c = course_or_404(course)
+    d = q("SELECT * FROM drills WHERE id=? AND course=?", (did, course), fetch="one") or abort(404)
+    return render_template("drill.html", c=c, d=d)
+
+
+@app.route("/<course>/drill/<int:did>/submit", methods=["POST"])
+@login_required
+def drill_submit(course, did):
+    c = course_or_404(course)
+    d = q("SELECT * FROM drills WHERE id=? AND course=?", (did, course), fetch="one") or abort(404)
+    ans = (request.form.get("answer") or "").strip()
+    if len(ans) < 10:
+        flash("สั้นไป")
+        return redirect(url_for("drill", course=course, did=did))
+    try:
+        r = grader.grade_drill(c["teacher_context"], d, ans)
+    except Exception as ex:  # noqa
+        flash(f"ครูตรวจไม่สำเร็จ: {ex}")
+        return redirect(url_for("drill", course=course, did=did))
+    q("UPDATE drills SET answer=?, score=?, comment=? WHERE id=?", (ans, r["score"], r.get("comment", ""), did))
+    return redirect(url_for("drill", course=course, did=did))
+
+
+@app.route("/<course>/session/start", methods=["POST"])
+@login_required
+def session_start(course):
+    course_or_404(course)
+    if active_session():
+        return redirect(request.referrer or url_for("index", course=course))
+    sid = insert_returning("sessions", ["course", "started_at"], [course, now()])
+    session["focus_id"] = sid
+    return redirect(request.referrer or url_for("index", course=course))
+
+
+@app.route("/<course>/session/end", methods=["POST"])
+@login_required
+def session_end(course):
+    s = active_session()
+    if s:
+        started = datetime.fromisoformat(s["started_at"])
+        mins = max(1, int((datetime.utcnow() - started).total_seconds() // 60))
+        q("UPDATE sessions SET ended_at=?, minutes=?, note=? WHERE id=?",
+          (now(), mins, (request.form.get("note") or "").strip()[:300], s["id"]))
+        session.pop("focus_id", None)
+        flash(f"บันทึก session {mins} นาที")
     return redirect(url_for("notebook", course=course))
 
 

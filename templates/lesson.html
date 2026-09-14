@@ -6,6 +6,12 @@
   <h1>{{ l.title }}</h1>
   <p class="tagline">{{ l.tagline }}</p>
 
+  {% if pre %}
+  <details class="card hist"><summary>สิ่งที่เพื่อนตอบก่อนอ่าน</summary>
+    {% for qu in l.retrieval %}<p class="lbl">{{ qu }}</p><p>{{ pre.answers[loop.index0] }}</p>{% endfor %}
+    <p class="muted small">อ่านจบแล้วกลับมาดูว่าตอบไว้ตรงไหน ผิดตรงไหน — จุดที่ผิดคือจุดที่จะจำได้แม่นที่สุด</p>
+  </details>
+  {% endif %}
   {% for s in l.sections %}
   <section>
     <h2>{{ s.h }}</h2>

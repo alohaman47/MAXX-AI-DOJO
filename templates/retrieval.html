@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}ก่อนอ่านบท {{ l.id }}{% endblock %}
+{% block body %}
+<article class="lesson">
+  <p class="crumb"><a href="{{ url_for('index', course=c.slug) }}">{{ c.title }}</a> / บท {{ l.id }}</p>
+  <h1>ก่อนอ่าน: {{ l.title }}</h1>
+  <p class="tagline">ตอบจากที่รู้ตอนนี้ ไม่รู้ก็เดา ห้ามค้น — ไม่มีคะแนน แต่ต้องตอบก่อนถึงจะเห็นเนื้อหา</p>
+  <p class="muted small">การพยายามดึงคำตอบจากหัวก่อนรู้ ทำให้จำได้ดีกว่าอ่านเฉยๆ ประมาณ 2 เท่า รู้สึกโง่คือสัญญาณว่ามันทำงาน</p>
+  <form method="post" action="{{ url_for('retrieval_submit', course=c.slug, lid=l.id) }}" class="card">
+    {% for qu in l.retrieval %}
+      <p class="lbl">ข้อ {{ loop.index }}</p>
+      <p class="q">{{ qu }}</p>
+      <textarea name="a{{ loop.index0 }}" rows="2" placeholder="ตอบสั้นๆ จากที่รู้" required></textarea>
+    {% endfor %}
+    <button type="submit">ส่งแล้วเปิดบทเรียน</button>
+  </form>
+</article>
+{% endblock %}

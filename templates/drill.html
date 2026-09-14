@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}ห้องซ้อม{% endblock %}
+{% block body %}
+<article class="exercise">
+  <p class="crumb"><a href="{{ url_for('notebook', course=c.slug) }}">สมุดพก</a> / ห้องซ้อม</p>
+  <h1>{{ d.title }}</h1>
+  <p class="tagline">ซ้อมจุดอ่อน: {{ d.weakness }}</p>
+  <p class="task">{{ d.prompt }}</p>
+  <p class="muted small">5 นาที ไม่นับคะแนนคอร์ส</p>
+  {% if d.answer %}
+    <section class="card grade">
+      <div class="scorebox"><b>{{ d.score }}</b><span>/10</span></div>
+      <p>{{ d.comment }}</p>
+      <p class="lbl">ที่ตอบ</p><pre class="answer">{{ d.answer }}</pre>
+    </section>
+    <form method="post" action="{{ url_for('drill_new', course=c.slug) }}"><button type="submit">ซ้อมข้อถัดไป</button></form>
+  {% else %}
+    <section class="card">
+      <form method="post" action="{{ url_for('drill_submit', course=c.slug, did=d.id) }}" onsubmit="return busy(this)">
+        <textarea name="answer" rows="8" placeholder="ทำเลย" required></textarea>
+        <button type="submit">ส่งให้ครูตรวจ</button>
+      </form>
+    </section>
+  {% endif %}
+</article>
+{% endblock %}
+{% block script %}<script>function busy(f){const b=f.querySelector('button');b.disabled=true;b.textContent='ครูกำลังตรวจ…';return true;}</script>{% endblock %}
