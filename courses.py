@@ -35,7 +35,7 @@ def _apply_ultra():
             concept = ultra.FEYNMAN.get(slug, {}).get(l["id"])
             if concept and not any(e["id"].endswith("f") for e in l["exercises"]):
                 l["exercises"].append(ultra.feynman_exercise(l["id"], concept))
-        l0 = ultra.metalearning_lesson(c["title"], c["subtitle"])
+        l0 = ultra.metalearning_lesson(c["title"], c["subtitle"], lessons)
         l0["retrieval"] = []
         c["lessons"] = [l0] + lessons
 
